@@ -52,12 +52,12 @@ t2 = DockerOperator(
         "--full-refresh"
     ],
     auto_remove=True,
-    docker_url="unix://var/run/docker.sock",
-    network_mode="bridge",
+    docker_url="unix:///var/run/docker.sock",
+    network_mode="custom-elt-project_elt_network",
     mounts=[
-        Mount(source='/Users/justinchau/Development/data-engineering-db/postgres_transformations',
+        Mount(source='/mnt/d/PHAMVANTHAI/custom-elt-project/postgres_transformations',
               target='/dbt', type='bind'),
-        Mount(source='/Users/justinchau/.dbt', target='/root', type='bind'),
+        Mount(source='/home/minhthai/.dbt', target='/root', type='bind'),
     ],
     dag=dag
 )
