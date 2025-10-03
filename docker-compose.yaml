@@ -1,5 +1,13 @@
 version: '3'
 
+# Khai báo extension field ở top-level
+x-airflow-image: &airflow_image
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: airflow-custom:3.1.0
+
+
 services:
   source_postgres:
     image: postgres:15
@@ -29,34 +37,103 @@ services:
     # volumes:
     #   - destination_db_data:/var/lib/postgresql/data
 
-  elt_script:
-    build:
-      context: ./elt_script # Directory containing the Dockerfile and elt_script.py
-      dockerfile: Dockerfile # Name of the Dockerfile, if it's something other than "Dockerfile", specify here
-    command: [ "python", "elt_script.py" ]
+  # elt_script:
+  #   build:
+  #     context: ./elt_script # Directory containing the Dockerfile and elt_script.py
+  #     dockerfile: Dockerfile # Name of the Dockerfile, if it's something other than "Dockerfile", specify here
+  #   command: [ "python", "elt_script.py" ]
+  #   networks:
+  #     - elt_network
+  #   depends_on:
+  #     - destination_postgres
+
+  # dbt:
+  #   image: ghcr.io/dbt-labs/dbt-postgres:1.4.7
+  #   entrypoint: [ "bash", "-c" ]
+  #   command:
+  #     - |
+  #       dbt run --profiles-dir /root --project-dir /dbt --full-refresh ;
+  #       dbt test --profiles-dir /root --project-dir /dbt -m actors ;
+  #       tail -f /dev/null
+  #   networks:
+  #     - elt_network
+  #   volumes:
+  #     - ./postgres_transformations:/dbt
+  #     - ~/.dbt:/root
+  #   depends_on:
+  #     - elt_script
+  #   environment:
+  #     DBT_PROFILE: default
+  #     DBT_TARGET: dev
+
+  postgres:
+    image: postgres:latest
     networks:
       - elt_network
-    depends_on:
-      - destination_postgres
+    environment:
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
 
-  dbt:
-    image: ghcr.io/dbt-labs/dbt-postgres:1.4.7
-    entrypoint: [ "bash", "-c" ]
-    command:
-      - |
-        dbt run --profiles-dir /root --project-dir /dbt --full-refresh ;
-        dbt test --profiles-dir /root --project-dir /dbt -m actors ;
-        tail -f /dev/null
+  init-airflow:
+    <<: *airflow_image
+    depends_on:
+      - postgres
+    networks:
+      - elt_network
+    environment:
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+    command: >
+      bash -c "
+        until pg_isready -h postgres -p 5432; do sleep 1; done &&
+        airflow db migrate
+      "
+
+  webserver:
+    <<: *airflow_image
+    user: root
+    depends_on:
+      - postgres
+      - scheduler
+      - init-airflow
     networks:
       - elt_network
     volumes:
-      - ./postgres_transformations:/dbt
-      - ~/.dbt:/root
-    depends_on:
-      - elt_script
+      - ./airflow/dags:/opt/airflow/dags
+      - ./elt_script:/opt/airflow/elt_script
+      - ./postgres_transformations:/opt/dbt
+      - ~/.dbt:/root/.dbt
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
-      DBT_PROFILE: default
-      DBT_TARGET: dev
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+      - AIRFLOW__CORE__FERNET_KEY=plIipb9RU3-3wJ1UNaAtqVNJrqFEks1-dGbJM34EW7U=
+      - AIRFLOW__WEBSERVER__SECRET_KEY=secret
+      - AIRFLOW_WWW_USER_USERNAME=airflow
+      - AIRFLOW_WWW_USER_PASSWORD=password
+    ports:
+      - "8080:8080"
+    command: api-server
+
+  scheduler:
+    <<: *airflow_image
+    user: root
+    depends_on:
+      - postgres
+    networks:
+      - elt_network
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./elt_script:/opt/airflow/elt_script
+      - ./postgres_transformations:/dbt
+      - ~/.dbt:/root/.dbt
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+      - AIRFLOW__CORE__FERNET_KEY=plIipb9RU3-3wJ1UNaAtqVNJrqFEks1-dGbJM34EW7U=
+      - AIRFLOW__WEBSERVER__SECRET_KEY=secret
+      - AIRFLOW_WWW_USER_USERNAME=airflow
+      - AIRFLOW_WWW_USER_PASSWORD=password
+    command: scheduler
 
 networks:
   elt_network:
