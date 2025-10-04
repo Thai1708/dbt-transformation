@@ -92,6 +92,7 @@ services:
       - AIRFLOW__SMTP__SMTP_USER=minhthai170807@gmail.com
       - AIRFLOW__SMTP__SMTP_PASSWORD=rgmr jltl eagi xtpc
       - AIRFLOW__SMTP__SMTP_MAIL_FROM=minhthai170807@gmail.com
+      - AIRFLOW__WEBSERVER__EXPOSE_CONFIG=True
     ports:
       - "8080:8080"
     command: webserver

@@ -5,6 +5,7 @@ from docker.types import Mount
 from airflow.operators.python_operator import PythonOperator
 from airflow.operators.bash import BashOperator
 from airflow.operators.email import EmailOperator
+from airflow.models import Variable
 
 
 from airflow.providers.docker.operators.docker import DockerOperator
@@ -46,12 +47,13 @@ t1 = PythonOperator(
 
 send_email = EmailOperator(
     task_id='send_success_email',
-    to='minhthai170807@gmail.com',
+    to=Variable.get("my_email"),
     subject='[Airflow] DAG {{ dag.dag_id }} chạy thành công',
     html_content="""
-    <h3>DAG {{ dag.dag_id }} đã hoàn thành thành công</h3>
-    <p>Execution date: {{ ds }}</p>
-    """,
+        <h2 style="color:red;">Xin chào từ Airflow!</h2>
+        <p>DAG <b>{{ dag.dag_id }}</b> đã chạy thành công lúc {{ ds }}.</p>
+        <p><i>Đây là email với nội dung HTML.</i></p>
+        """,
     dag=dag,
 )
 
