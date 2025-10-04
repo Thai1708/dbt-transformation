@@ -54,6 +54,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    # mem_limit: 512m
+    # cpus: 0.5
     user: root
     depends_on:
       postgres:
@@ -114,6 +116,9 @@ services:
       - AIRFLOW__WEBSERVER__SECRET_KEY=secret
       - AIRFLOW_WWW_USER_USERNAME=airflow
       - AIRFLOW_WWW_USER_PASSWORD=password
+      - AIRFLOW__CORE__PARALLELISM=16
+      - AIRFLOW__CORE__DAG_CONCURRENCY=8
+      - AIRFLOW__CORE__MAX_ACTIVE_RUNS_PER_DAG=1
     command: scheduler
 
 networks:

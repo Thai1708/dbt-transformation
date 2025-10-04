@@ -27,11 +27,13 @@ def run_elt_script():
 
 
 dag = DAG(
-    'elt_and_dbt',
+    'test_dag',
     default_args=default_args,
     description='An ELT workflow with dbt',
-    start_date=datetime(2023, 10, 3),
+    schedule_interval="@daily",
+    start_date=datetime(2025, 9, 30),
     catchup=False,
+    is_paused_upon_creation=False,
 )
 
 t1 = PythonOperator(
@@ -40,26 +42,4 @@ t1 = PythonOperator(
     dag=dag,
 )
 
-t2 = DockerOperator(
-    task_id='dbt_run',
-    image='ghcr.io/dbt-labs/dbt-postgres:1.4.7',
-    command=[
-        "run",
-        "--profiles-dir",
-        "/root",
-        "--project-dir",
-        "/dbt",
-        "--full-refresh"
-    ],
-    auto_remove=True,
-    docker_url="unix:///var/run/docker.sock",
-    network_mode="custom-elt-project_elt_network",
-    mounts=[
-        Mount(source='/mnt/d/PHAMVANTHAI/custom-elt-project/postgres_transformations',
-              target='/dbt', type='bind'),
-        Mount(source='/home/minhthai/.dbt', target='/root', type='bind'),
-    ],
-    dag=dag
-)
-
-t1 >> t2
+t1
